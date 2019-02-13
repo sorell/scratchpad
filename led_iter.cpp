@@ -38,78 +38,45 @@ void printLeds()
 
 
 
+template <typename T>
+class IteratorBase {
+public:
+	bool operator != (IteratorBase const &rhs) const { return p_ != rhs.p_; }
+	T *operator * () { return p_; }
+	void at() const { fprintf(stderr, "iterator at %d\n", (int) (p_ - leds)); }
+protected:
+	IteratorBase(T *p) : p_(p) {}
+	T *p_;
+};
+
+template <typename T>
+class ForwardIterator : public IteratorBase<T> {
+public:
+	ForwardIterator(T *p) : IteratorBase<T>(p) {}
+	ForwardIterator &operator ++ () { IteratorBase<T>::p_++; return *this; }
+	ForwardIterator &operator -- () { IteratorBase<T>::p_--; return *this; }
+};
+
+template <typename T>
+class ReverseIterator : public IteratorBase<T> {
+public:
+	ReverseIterator(T *p) : IteratorBase<T>(p) {}
+	ReverseIterator &operator ++ () { IteratorBase<T>::p_--; return *this; }
+	ReverseIterator &operator -- () { IteratorBase<T>::p_++; return *this; }
+};
+
+
 
 
 
 class LedArrayForward {};
 class LedArrayReverse {};
 
-
-
-
-
-// template <>
-// class LedArray {};
-
 class LedArrayBase
 {
 protected:
 	LedArrayBase(CRGB *begin, CRGB *end) : begin_(begin), end_(end) {}
 
-protected:
-#if 0
-	class iterator {
-		friend LedArrayBase;
-	public:
-		bool operator != (iterator const &rhs) const { return p_ != rhs.p_; }
-		iterator &operator ++ () { p_++; return *this; }
-		iterator &operator -- () { p_--; return *this; }
-		CRGB &operator * () { return *p_; }
-		void at() const { fprintf(stderr, "iterator at %d\n", (int) (p_ - leds)); }
-	protected:
-		iterator(CRGB *p) : p_(p) {}
-	private:
-		CRGB *p_;
-	};
-
-	class reverse_iterator : public iterator {
-		friend LedArrayBase;
-	public:
-		reverse_iterator &operator ++ () { fprintf(stderr, "backw++\n"); LedArrayBase::iterator::operator --(); return *this; }
-		reverse_iterator &operator -- () { LedArrayBase::iterator::operator ++(); return *this; }
-	protected:
-		reverse_iterator(CRGB *p) : iterator(p) {}
-	};
-#endif
-
-	class IteratorBase {
-	public:
-		bool operator != (IteratorBase const &rhs) const { return p_ != rhs.p_; }
-		CRGB *&operator * () { return p_; }
-		void at() const { fprintf(stderr, "iterator at %d\n", (int) (p_ - leds)); }
-	protected:
-		IteratorBase(CRGB *p) : p_(p) {}
-		CRGB *p_;
-	};
-
-	class ForwardIterator : public IteratorBase {
-		friend LedArrayBase;
-	public:
-		ForwardIterator &operator ++ () { p_++; return *this; }
-		ForwardIterator &operator -- () { p_--; return *this; }
-	protected:
-		ForwardIterator(CRGB *p) : IteratorBase(p) {}
-	};
-
-	class ReverseIterator : public IteratorBase {
-		friend LedArrayBase;
-	public:
-		ReverseIterator &operator ++ () { p_--; return *this; }
-		ReverseIterator &operator -- () { p_++; return *this; }
-	protected:
-		ReverseIterator(CRGB *p) : IteratorBase(p) {}
-	};
-protected:
 	CRGB *const begin_;
 	CRGB *const end_;
 };
@@ -123,35 +90,29 @@ class LedArray : public LedArrayBase
 public:
 	LedArray(CRGB *leds, uint8_t first, uint8_t amount) : LedArrayBase(leds + first, leds + first + amount) {}
 
-	typedef LedArrayBase::ForwardIterator iterator;
-	typedef LedArrayBase::ReverseIterator r_iterator;
+	typedef ForwardIterator<CRGB> iterator;
+	typedef ReverseIterator<CRGB> r_iterator;
 
 	iterator begin() { return iterator(begin_); }
 	iterator end() { return iterator(end_); }
 	r_iterator r_begin() { return r_iterator(end_-1); }
 	r_iterator r_end() { return r_iterator(begin_-1); }
-
 };
 
 
 template <>
 class LedArray<LedArrayReverse> : public LedArrayBase
 {
-protected:
-	// class iterator : public LedArrayBase::iterator {
-	// 	friend LedArray<LedArrayReverse>;
-	// public:
-	// 	LedArrayBase::iterator &operator ++ () { return LedArrayBase::iterator::operator -- (); }
-	// 	LedArrayBase::iterator &operator -- () { return LedArrayBase::iterator::operator ++ (); }
-	// protected:
-	// 	iterator(CRGB *p) : LedArrayBase::iterator(p) {}
-	// };
-
 public:
 	LedArray(CRGB *leds, uint8_t first, uint8_t amount) : LedArrayBase(leds + first + amount - 1, leds + first - 1) {}
 
+	typedef ReverseIterator<CRGB> iterator;
+	typedef ForwardIterator<CRGB> r_iterator;
+
 	iterator begin() { return iterator(begin_); }
 	iterator end() { return iterator(end_); }
+	r_iterator r_begin() { return r_iterator(end_+1); }
+	r_iterator r_end() { return r_iterator(begin_+1); }
 };
 
 
@@ -190,10 +151,22 @@ void doStuff()
 	printLeds();
 
 	fprintf(stderr, "Modify topRow1\n");
+	deadman = 10;
 	for (auto it = topRow1.begin(); it != topRow1.end(); ++it) {
 		it.at();
 		**it = red;
 		red.r++;
+		if (--deadman == 0) return;
+	}
+	printLeds();
+
+	fprintf(stderr, "Modify topRow1 backwards\n");
+	deadman = 10;
+	for (auto it = topRow1.r_begin(); it != topRow1.r_end(); ++it) {
+		it.at();
+		**it = red;
+		red.r++;
+		if (--deadman == 0) return;
 	}
 	printLeds();
 }
